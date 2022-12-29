@@ -1,0 +1,22 @@
+{
+  "name": "RadioLink",
+  "version": "0.1",
+  "keywords": "Arduino, Lora, IoT",
+  "description": "High level protocol for IoT radio communication",
+  "repository":
+  {
+    "type": "git",
+    "url": "https://github.com/PM04290/RadioLink
+  },
+  "authors":
+  [
+    {
+        "name": "Matieres & lumiere",
+        "email": "contact@matieresetlumiere.fr",
+        "maintainer": true
+    }
+  ],
+  "frameworks": "arduino",
+  "platforms": ["atmelavr", "atmelsam", "ststm32", "espressif8266", "espressif32", "samd"],
+  "headers": "RadioLink.h"
+}
