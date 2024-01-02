@@ -15,6 +15,8 @@ class RLhelper_base {
     RLhelper_base() {}
     virtual int begin(long frequency) { return 0; }
     virtual int lqi() { return 0; }
+	virtual void sleep();
+	virtual void idle();
     virtual void setTxPower(int level) {}
 	virtual int read(byte* buf, uint8_t len);
 	virtual int write(byte* buf, uint8_t len) { return 0; }

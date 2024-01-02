@@ -112,11 +112,6 @@ int RLhelper_SX1278::begin(long frequency)
   // check version
   uint8_t version = readRegister(REG_VERSION);
   if (version != 0x12) {
-#if defined(__AVR_ATtiny84__)
-    digitalWrite(0,HIGH); // delete this 3 lines if you don't have LED on pin 0 of ATtiny84
-    delay(2000);
-    digitalWrite(0,LOW);
-#endif
     return 0;
   }
   // put in sleep mode
