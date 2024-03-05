@@ -30,6 +30,7 @@ class RadioLinkClass
   public:
     RadioLinkClass() { _waitOnTx = false; };
     bool begin(long frequency, void(*callbackR)(uint8_t,rl_packet_t*), void(*callbackT)(), int TxLevel);
+	void end();
     static void onRxDone(int packetSize);
     static void onTxDone();
 	int  lqi();

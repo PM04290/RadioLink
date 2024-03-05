@@ -29,7 +29,19 @@
 	const uint8_t RL_DEFAULT_RESET_PIN  = 2;
 	const uint8_t RL_DEFAULT_DINT_PIN   = 8;
 #elif defined(ESP32)
-	#if defined(ARDUINO_ESP32_POE_ISO)
+	#if defined(ARDUINO_LOLIN_S2_MINI)
+		// defining NEW spi pin
+		//#define RL_DEFAULT_SPI         not defined for specific SPI
+		const uint8_t RL_NEW_MISO           = 9;
+		const uint8_t RL_NEW_MOSI           = 11;
+		const uint8_t RL_NEW_SCLK           = 7;
+		const uint8_t RL_NEW_SS             = 5;
+		SPIClass* RL_DEFAULT_SPI            = new SPIClass(HSPI);
+		const long RL_DEFAULT_SPI_FREQUENCY = 8E6;
+		const uint8_t RL_DEFAULT_SS_PIN     =  5;
+		const uint8_t RL_DEFAULT_RESET_PIN  = 12;
+		const uint8_t RL_DEFAULT_DINT_PIN   =  3;
+	#elif defined(ARDUINO_ESP32_POE_ISO)
 		// defining NEW spi pin
 		//#define RL_DEFAULT_SPI         not defined for specific SPI
 		const uint8_t RL_NEW_MISO           = 15;
@@ -47,12 +59,12 @@
 		const uint8_t RL_NEW_MISO           = 15;
 		const uint8_t RL_NEW_MOSI           = 2;
 		const uint8_t RL_NEW_SCLK           = 14;
-		const uint8_t RL_NEW_SS             = 5;
+		const uint8_t RL_NEW_SS             = 12;
 		SPIClass* RL_DEFAULT_SPI            = new SPIClass(HSPI);
 		const long RL_DEFAULT_SPI_FREQUENCY = 8E6;
-		const uint8_t RL_DEFAULT_SS_PIN     =  5;
+		const uint8_t RL_DEFAULT_SS_PIN     =  12;
 		const uint8_t RL_DEFAULT_RESET_PIN  =  4;
-		const uint8_t RL_DEFAULT_DINT_PIN   =  36;
+		const uint8_t RL_DEFAULT_DINT_PIN   =  35;
 	#else
 		const uint8_t RL_NEW_MISO           = 0;
 		const uint8_t RL_NEW_MOSI           = 0;
@@ -64,6 +76,16 @@
 		const uint8_t RL_DEFAULT_RESET_PIN  =  4;
 		const uint8_t RL_DEFAULT_DINT_PIN   =  2;
 	#endif
+#elif defined(ESP32S2)
+	const uint8_t RL_NEW_MISO           = 0;
+	const uint8_t RL_NEW_MOSI           = 0;
+	const uint8_t RL_NEW_SCLK           = 0;
+	const uint8_t RL_NEW_SS             = 0;
+	SPIClass* RL_DEFAULT_SPI            = &SPI;
+	const long RL_DEFAULT_SPI_FREQUENCY = 8E6;
+	const uint8_t RL_DEFAULT_SS_PIN     = 12;
+	const uint8_t RL_DEFAULT_RESET_PIN  =  4;
+	const uint8_t RL_DEFAULT_DINT_PIN   = 35;
 #else
 	const uint8_t RL_NEW_MISO           = 0;
 	const uint8_t RL_NEW_MOSI           = 0;
@@ -110,10 +132,18 @@ bool RadioLinkClass::begin(long frequency, void(*callbackR)(uint8_t,rl_packet_t*
 	RLhelper.onInternalRxDone(onRxDone);
 	RLhelper.onInternalTxDone(onTxDone);
 	RLhelper.setTxPower(TxLevel);
+	//RLhelper.setSpreadingFactor(9);
+	//RLhelper.setSignalBandwidth(6);
+	//RLhelper.setCodingRate4(7);
 	RLhelper.receiveMode();
 	return true;
   }
   return false;
+}
+
+void RadioLinkClass::end()
+{
+	RLhelper.end();
 }
 
 void RadioLinkClass::onRxDone(int packetSize)
@@ -192,7 +222,7 @@ void RadioLinkClass::publishPaquet(rl_packets packet, byte version)
       packet.current.crc += ((uint8_t *)&packet.current)[i];
     }
     RLhelper.write((uint8_t *)&packet, sizeof(packet.current));
-    while (_waitOnTx && RLhelper.isTransmitting());
+    while (_waitOnTx && RLhelper.isTransmitting()) { delay(2); };
 	return;
   }
   if (version == 1)

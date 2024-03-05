@@ -8,10 +8,15 @@ class RLhelper_SX1278 : public RLhelper_base {
   public:
     RLhelper_SX1278();
     int begin(long frequency) override;
+	void end() override;
     int lqi() override;
 	void sleep() override;
 	void idle() override;
     void setTxPower(int level) override;
+	void setFrequency(long frequency);
+	void setSpreadingFactor(int sf);
+	void setSignalBandwidth(int bw);
+	void setCodingRate4(int denominator);
 	int read(byte* buf, uint8_t len) override;
 	int write(byte* buf, uint8_t len) override;
 	int receiveMode() override;
@@ -32,8 +37,10 @@ class RLhelper_SX1278 : public RLhelper_base {
     uint8_t readRegister(uint8_t address);
 	void writeRegister(uint8_t address, uint8_t value);
     uint8_t singleTransfer(uint8_t address, uint8_t value);
-	void setFrequency(long frequency);
 	void setOCP(uint8_t mA);
+	void setLdoFlag();
+	int getSpreadingFactor();
+	long getSignalBandwidth();
 	int beginPacket();
 	int endPacket();
 };

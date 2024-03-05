@@ -14,6 +14,7 @@ class RLhelper_base {
   public:
     RLhelper_base() {}
     virtual int begin(long frequency) { return 0; }
+	virtual void end();
     virtual int lqi() { return 0; }
 	virtual void sleep();
 	virtual void idle();
