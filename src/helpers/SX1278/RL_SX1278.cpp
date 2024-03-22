@@ -25,8 +25,6 @@
 
 #include "RL_SX1278.h"
 #include "../../RadioLink.h"
-//#include <SendOnlySoftwareSerial.h>
-//extern SendOnlySoftwareSerial Serial;
 
 // registers
 #define REG_FIFO                 0x00
@@ -431,6 +429,7 @@ int RLhelper_SX1278::beginPacket()
   }
   // put in standby mode
   idle();
+
   // reset FIFO address and paload length
   writeRegister(REG_FIFO_ADDR_PTR, 0);
   writeRegister(REG_PAYLOAD_LENGTH, 0);
@@ -445,19 +444,12 @@ int RLhelper_SX1278::endPacket()
   }
   // put in TX mode
   writeRegister(REG_OP_MODE, MODE_LONG_RANGE_MODE | MODE_TX);
-  // wait for FS wake up
-  uint8_t reg;
-  do {
-    reg = readRegister(REG_OP_MODE);
-	//Serial.println(reg,HEX);
-  } while ((reg & MODE_TX) != MODE_TX);
   return 1;
 }
 
 bool RLhelper_SX1278::isTransmitting()
 {
   uint8_t reg = readRegister(REG_OP_MODE);
-
   if ((reg & MODE_TX) == MODE_TX) {
     return true;
   }

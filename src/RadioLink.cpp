@@ -24,7 +24,7 @@
 	const uint8_t RL_NEW_SCLK           = 0;
 	const uint8_t RL_NEW_SS             = 0;
 	SPIClass* RL_DEFAULT_SPI            = &SPI;
-	const long RL_DEFAULT_SPI_FREQUENCY = 8E6;
+	const long RL_DEFAULT_SPI_FREQUENCY = 8E6; // not used
 	const uint8_t RL_DEFAULT_SS_PIN     = 3;
 	const uint8_t RL_DEFAULT_RESET_PIN  = 2;
 	const uint8_t RL_DEFAULT_DINT_PIN   = 8;
@@ -117,6 +117,7 @@ static rl_packet_t currentPacket;
 
 void (*_onRxDone)(uint8_t,rl_packet_t*);
 void (*_onTxDone)();
+uint8_t _TXdone = 0;
 
 ISR_PREFIX void RLhelper_base::onDintRise()
 {
@@ -152,17 +153,14 @@ void RadioLinkClass::onRxDone(int packetSize)
   if (packetSize > sizeof(currentPacket)) packetSize = sizeof(currentPacket);
   byte* raw = (byte*)&currentPacket;
   RLhelper.read(raw, packetSize);
-  // CRC check since V4
-  if (packetSize == RL_PACKETV4_SIZE) {
-	  uint8_t crc = CRC_PRELOAD;
-	  for (uint8_t i = 0; i < packetSize-1; i++)
-	  {
-		  crc += raw[i];
-	  }
-	  if (crc != currentPacket.crc)
-	  {
-		  return;
-	  }
+  uint8_t crc = CRC_PRELOAD;
+  for (uint8_t i = 0; i < packetSize-1; i++)
+  {
+	  crc += raw[i];
+  }
+  if (crc != currentPacket.crc)
+  {
+	  return;
   }
   if (_onRxDone)
   {
@@ -172,6 +170,7 @@ void RadioLinkClass::onRxDone(int packetSize)
 
 void RadioLinkClass::onTxDone()
 {
+  _TXdone = true;
   RLhelper.receiveMode();
   if (_onTxDone)
   {
@@ -196,130 +195,90 @@ void RadioLinkClass::setWaitOnTx(bool state)
 	_waitOnTx = state;
 }
 
-
-void RadioLinkClass::publishPaquetV1(rl_packetV1_t packet)
-{
-  RLhelper.write((uint8_t *)&packet, sizeof(packet));
-}
-
-void RadioLinkClass::publishPaquetV2(rl_packetV2_t packet)
-{
-  RLhelper.write((uint8_t *)&packet, sizeof(packet));
-}
-
-void RadioLinkClass::publishPaquetV3(rl_packetV3_t packet)
-{
-  RLhelper.write((uint8_t *)&packet, sizeof(packet));
-}
-
-void RadioLinkClass::publishPaquet(rl_packets packet, byte version)
+void RadioLinkClass::publishPaquet(rl_packets* packet, byte version)
 {
   if (version == 0 || version == RL_CURRENT_VERSION)
   {
-    packet.current.crc = CRC_PRELOAD;
-    for (uint8_t i = 0; i < sizeof(packet)-1; i++)
+    packet->current.crc = CRC_PRELOAD;
+    for (uint8_t i = 0; i < sizeof(rl_packets)-1; i++)
     {
-      packet.current.crc += ((uint8_t *)&packet.current)[i];
+      packet->current.crc += ((uint8_t *)&packet->current)[i];
     }
-    RLhelper.write((uint8_t *)&packet, sizeof(packet.current));
-    while (_waitOnTx && RLhelper.isTransmitting()) { delay(2); };
+	_TXdone = false;
+    RLhelper.write((uint8_t *)packet, sizeof(packet->current));
+    while (_waitOnTx && !_TXdone) { delay(2); };
 	return;
-  }
-  if (version == 1)
-  {
-    publishPaquetV1(packet.v1);
-    return;
-  }
-  if (version == 2)
-  {
-    publishPaquetV2(packet.v2);
-    return;
-  }
-  if (version == 3)
-  {
-    publishPaquetV3(packet.v3);
-    return;
   }
 }
 
-void RadioLinkClass::publishNum(byte destinationid, byte senderid, byte childid, rl_device_t sensortype, const long value, byte version)
+void RadioLinkClass::publishBool(byte destinationid, byte senderid, byte childid, const uint8_t value, byte version)
 {
   rl_packets packet;
   switch (version) {
 	  case 1:
-		  packet.v1.destinationID = destinationid;
-		  packet.v1.senderID = senderid;
-		  packet.v1.childID = childid;
-		  packet.v1.sensordataType = (sensortype << 3) + V_NUM;
-		  packet.v1.data.num.value = value;
-	  break;
-	  case 2:
-		  packet.v2.destinationID = destinationid;
-		  packet.v2.senderID = senderid;
-		  packet.v2.childID = childid;
-		  packet.v2.sensordataType = (sensortype << 3) + V_NUM;
-		  packet.v2.data.num.value = value;
-	  break;
-	  case 3:
-		  packet.v3.destinationID = destinationid;
-		  packet.v3.senderID = senderid;
-		  packet.v3.childID = childid;
-		  packet.v3.sensordataType = (sensortype << 3) + V_NUM;
-		  packet.v3.data.num.value = value;
-	  break;
 	  default:
 		  packet.current.destinationID = destinationid;
 		  packet.current.senderID = senderid;
 		  packet.current.childID = childid;
-		  packet.current.sensordataType = (sensortype << 3) + V_NUM;
+		  packet.current.sensordataType = (S_BINARYSENSOR << 3) + V_BOOL;
 		  packet.current.data.num.value = value;
 	  break;
   }
-  publishPaquet(packet, version);
+  publishPaquet(&packet, version);
 }
 
-void RadioLinkClass::publishFloat(byte destinationid, byte senderid, byte childid, rl_device_t sensortype, const long value, const int divider, const byte precision, byte version)
+void RadioLinkClass::publishNum(byte destinationid, byte senderid, byte childid, const long value, byte version)
 {
   rl_packets packet;
   switch (version) {
 	  case 1:
-		  packet.v1.destinationID = destinationid;
-		  packet.v1.senderID = senderid;
-		  packet.v1.childID = childid;
-		  packet.v1.sensordataType =  (sensortype << 3) + V_FLOAT;
-		  packet.v1.data.num.value = value;
-		  packet.v1.data.num.divider = divider;
-		  packet.v1.data.num.precision = precision;
-	  break;
-	  case 2:
-		  packet.v2.destinationID = destinationid;
-		  packet.v2.senderID = senderid;
-		  packet.v2.childID = childid;
-		  packet.v2.sensordataType =  (sensortype << 3) + V_FLOAT;
-		  packet.v2.data.num.value = value;
-		  packet.v2.data.num.divider = divider;
-		  packet.v2.data.num.precision = precision;
-	  break;
-	  case 3:
-		  packet.v3.destinationID = destinationid;
-		  packet.v3.senderID = senderid;
-		  packet.v3.childID = childid;
-		  packet.v3.sensordataType =  (sensortype << 3) + V_FLOAT;
-		  packet.v3.data.num.value = value;
-		  packet.v3.data.num.divider = divider;
-		  packet.v3.data.num.precision = precision;
-	  break;
 	  default:
 		  packet.current.destinationID = destinationid;
 		  packet.current.senderID = senderid;
 		  packet.current.childID = childid;
-		  packet.current.sensordataType =  (sensortype << 3) + V_FLOAT;
+		  packet.current.sensordataType = (S_NUMERICSENSOR << 3) + V_NUM;
+		  packet.current.data.num.value = value;
+		  packet.current.data.num.divider = 0;
+		  packet.current.data.num.precision = 0;
+	  break;
+  }
+  publishPaquet(&packet, version);
+}
+
+void RadioLinkClass::publishFloat(byte destinationid, byte senderid, byte childid, const long value, const int divider, const byte precision, byte version)
+{
+  rl_packets packet;
+  switch (version) {
+	  case 1:
+	  default:
+		  packet.current.destinationID = destinationid;
+		  packet.current.senderID = senderid;
+		  packet.current.childID = childid;
+		  packet.current.sensordataType =  (S_NUMERICSENSOR << 3) + V_FLOAT;
 		  packet.current.data.num.value = value;
 		  packet.current.data.num.divider = divider;
 		  packet.current.data.num.precision = precision;
 	  break;
   }
-  publishPaquet(packet, version);
+  publishPaquet(&packet, version);
+}
+
+void RadioLinkClass::publishSwitch(byte destinationid, byte senderid, byte childid, const uint8_t value, byte version)
+{
+  rl_packets packet;
+  switch (version) {
+	  case 1:
+	  default:
+		  packet.current.destinationID = destinationid;
+		  packet.current.senderID = senderid;
+		  packet.current.childID = childid;
+		  packet.current.sensordataType = (S_SWITCH << 3) + V_NUM;
+		  packet.current.data.num.value = value;
+		  packet.current.data.num.divider = 0;
+		  packet.current.data.num.precision = 0;
+	  break;
+  }
+  publishPaquet(&packet, version);
 }
 
 void RadioLinkClass::publishText(byte destinationid, byte senderid, byte childid, const char* text, byte version)
@@ -331,35 +290,6 @@ void RadioLinkClass::publishText(byte destinationid, byte senderid, byte childid
   }
   switch (version) {
 	  case 1:
-		  packet.v1.destinationID = destinationid;
-		  packet.v1.senderID = senderid;
-		  packet.v1.childID = childid;
-		  packet.v1.sensordataType =  (SV1_INPUTTEXT << 3) + V_TEXT;
-		  strncpy(packet.v1.data.text, text, l);
-		  if (l < MAX_PACKET_DATA_LEN) {
-			packet.v1.data.text[l] = 0;
-		  }
-	  break;
-	  case 2:
-		  packet.v2.destinationID = destinationid;
-		  packet.v2.senderID = senderid;
-		  packet.v2.childID = childid;
-		  packet.v2.sensordataType =  (SV2_TEXTSENSOR << 3) + V_TEXT;
-		  strncpy(packet.v2.data.text, text, l);
-		  if (l < MAX_PACKET_DATA_LEN) {
-			packet.v2.data.text[l] = 0;
-		  }
-	  break;
-	  case 3:
-		  packet.v3.destinationID = destinationid;
-		  packet.v3.senderID = senderid;
-		  packet.v3.childID = childid;
-		  packet.v3.sensordataType =  (S_TEXTSENSOR << 3) + V_TEXT;
-		  strncpy(packet.v3.data.text, text, l);
-		  if (l < MAX_PACKET_DATA_LEN) {
-			packet.v3.data.text[l] = 0;
-		  }
-	  break;
 	  default:
 		  packet.current.destinationID = destinationid;
 		  packet.current.senderID = senderid;
@@ -371,7 +301,7 @@ void RadioLinkClass::publishText(byte destinationid, byte senderid, byte childid
 		  }
 	  break;
   }
-  publishPaquet(packet, version);
+  publishPaquet(&packet, version);
 }
 
 void RadioLinkClass::publishTag(byte destinationid, byte senderid, byte childid, const uint32_t tagH, const uint32_t tagL, const byte readerID, const byte readerType, byte version)
@@ -379,33 +309,6 @@ void RadioLinkClass::publishTag(byte destinationid, byte senderid, byte childid,
   rl_packets packet;
   switch (version) {
 	  case 1:
-		  packet.v1.destinationID = destinationid;
-		  packet.v1.senderID = senderid;
-		  packet.v1.childID = childid;
-		  packet.v1.sensordataType =  (SV1_TAG << 3) + V_TAG;
-		  packet.v1.data.tag.tagH = tagH;
-		  packet.v1.data.tag.tagL = tagL;
-	  break;
-	  case 2:
-		  packet.v2.destinationID = destinationid;
-		  packet.v2.senderID = senderid;
-		  packet.v2.childID = childid;
-		  packet.v2.sensordataType =  (SV2_TAG << 3) + V_TAG;
-		  packet.v2.data.tag.tagH = tagH;
-		  packet.v2.data.tag.tagL = tagL;
-		  packet.v2.data.tag.readerID = readerID;
-		  packet.v2.data.tag.readerType = readerType;
-	  break;
-	  case 3:
-		  packet.v3.destinationID = destinationid;
-		  packet.v3.senderID = senderid;
-		  packet.v3.childID = childid;
-		  packet.v3.sensordataType =  (S_TAG << 3) + V_TAG;
-		  packet.v3.data.tag.tagH = tagH;
-		  packet.v3.data.tag.tagL = tagL;
-		  packet.v3.data.tag.readerID = readerID;
-		  packet.v3.data.tag.readerType = readerType;
-	  break;
 	  default:
 		  packet.current.destinationID = destinationid;
 		  packet.current.senderID = senderid;
@@ -417,7 +320,7 @@ void RadioLinkClass::publishTag(byte destinationid, byte senderid, byte childid,
 		  packet.current.data.tag.readerType = readerType;
 	  break;
   }
-  publishPaquet(packet, version);
+  publishPaquet(&packet, version);
 }
 
 void RadioLinkClass::publishRaw(byte destinationid, byte senderid, byte childid, const uint8_t* data, const byte len, byte version)
@@ -425,32 +328,6 @@ void RadioLinkClass::publishRaw(byte destinationid, byte senderid, byte childid,
   rl_packets packet;
   switch (version) {
 	  case 1:
-		  packet.v1.destinationID = destinationid;
-		  packet.v1.senderID = senderid;
-		  packet.v1.childID = childid;
-		  packet.v1.sensordataType =  (SV1_CUSTOM << 3) + V_RAW;
-		  for (byte b = 0; b < len && b < MAX_PACKET_DATA_LEN_V1; b++) {
-			packet.v1.data.rawByte[b] = data[b];
-		  }
-	  break;
-	  case 2:
-		  packet.v2.destinationID = destinationid;
-		  packet.v2.senderID = senderid;
-		  packet.v2.childID = childid;
-		  packet.v2.sensordataType =  (SV2_CUSTOM << 3) + V_RAW;
-		  for (byte b = 0; b < len && b < MAX_PACKET_DATA_LEN_V2; b++) {
-			packet.v2.data.rawByte[b] = data[b];
-		  }
-	  break;
-	  case 3:
-		  packet.v3.destinationID = destinationid;
-		  packet.v3.senderID = senderid;
-		  packet.v3.childID = childid;
-		  packet.v3.sensordataType =  (S_CUSTOM << 3) + V_RAW;
-		  for (byte b = 0; b < len && b < MAX_PACKET_DATA_LEN_V3; b++) {
-			packet.v3.data.rawByte[b] = data[b];
-		  }
-	  break;
 	  default:
 		  packet.current.destinationID = destinationid;
 		  packet.current.senderID = senderid;
@@ -461,7 +338,7 @@ void RadioLinkClass::publishRaw(byte destinationid, byte senderid, byte childid,
 		  }
 	  break;
   }
-  publishPaquet(packet, version);
+  publishPaquet(&packet, version);
 }
 
 void RadioLinkClass::publishLight(byte destinationid, byte senderid, byte childid, uint8_t state, uint8_t brightness, uint16_t temperature, uint8_t red, uint8_t green, uint8_t blue, byte version)
@@ -469,23 +346,6 @@ void RadioLinkClass::publishLight(byte destinationid, byte senderid, byte childi
   rl_packets packet;
   switch (version) {
 	  case 1:
-	    return;
-	  break;
-	  case 2:
-	    return;
-	  break;
-	  case 3:
-		  packet.v3.destinationID = destinationid;
-		  packet.v3.senderID = senderid;
-		  packet.v3.childID = childid;
-		  packet.v3.sensordataType =  (S_LIGHT << 3) + V_RAW;
-		  packet.v3.data.light.state = state;
-		  packet.v3.data.light.brightness = brightness;
-		  packet.v3.data.light.temperature = temperature;
-		  packet.v3.data.light.red = red;
-		  packet.v3.data.light.green = green;
-		  packet.v3.data.light.blue = blue;
-	  break;
 	  default:
 		  packet.current.destinationID = destinationid;
 		  packet.current.senderID = senderid;
@@ -499,7 +359,7 @@ void RadioLinkClass::publishLight(byte destinationid, byte senderid, byte childi
 		  packet.current.data.light.blue = blue;
 	  break;
   }
-  publishPaquet(packet, version);
+  publishPaquet(&packet, version);
 }
 
 void RadioLinkClass::publishCover(byte destinationid, byte senderid, byte childid, uint8_t command, uint8_t position, byte version)
@@ -507,20 +367,6 @@ void RadioLinkClass::publishCover(byte destinationid, byte senderid, byte childi
   rl_packets packet;
   switch (version) {
 	  case 1:
-	    return;
-	  break;
-	  case 2:
-	    return;
-	  break;
-	  case 3:
-		  packet.v3.destinationID = destinationid;
-		  packet.v3.senderID = senderid;
-		  packet.v3.childID = childid;
-		  packet.v3.sensordataType =  (S_COVER << 3) + V_RAW;
-		  packet.v3.data.cover.state = 0;
-		  packet.v3.data.cover.command = command;
-		  packet.v3.data.cover.position = position;
-	  break;
 	  default:
 		  packet.current.destinationID = destinationid;
 		  packet.current.senderID = senderid;
@@ -531,37 +377,21 @@ void RadioLinkClass::publishCover(byte destinationid, byte senderid, byte childi
 		  packet.current.data.cover.position = position;
 	  break;
   }
-  publishPaquet(packet, version);
+  publishPaquet(&packet, version);
 }
 
-void RadioLinkClass::publishConfig(byte destinationid, byte senderid, byte childid, const uint8_t* data, const byte len, byte version)
+void RadioLinkClass::publishConfig(byte destinationid, byte senderid, byte childid, rl_config_t cnf, byte version)
 {
   rl_packets packet;
   switch (version) {
 	  case 1:
-	    return;
-	  break;
-	  case 2:
-	    return;
-	  break;
-	  case 3:
-		  packet.v3.destinationID = destinationid;
-		  packet.v3.senderID = senderid;
-		  packet.v3.childID = childid;
-		  packet.v3.sensordataType =  (S_CONFIG << 3) + V_RAW;
-		  for (byte b = 0; b < len && b < MAX_PACKET_DATA_LEN_V3; b++) {
-			packet.v3.data.rawByte[b] = data[b];
-		  }
-	  break;
 	  default:
 		  packet.current.destinationID = destinationid;
 		  packet.current.senderID = senderid;
 		  packet.current.childID = childid;
 		  packet.current.sensordataType =  (S_CONFIG << 3) + V_RAW;
-		  for (byte b = 0; b < len && b < MAX_PACKET_DATA_LEN; b++) {
-			packet.current.data.rawByte[b] = data[b];
-		  }
+		  packet.current.data.config = cnf;
 	  break;
   }
-  publishPaquet(packet, version);
+  publishPaquet(&packet, version);
 }

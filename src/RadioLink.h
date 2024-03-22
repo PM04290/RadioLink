@@ -37,18 +37,17 @@ class RadioLinkClass
 	void sleep();
 	void idle();
 	void setWaitOnTx(bool state);
-    void publishPaquetV1(rl_packetV1_t packet); // For legacy, there is only send packet
-    void publishPaquetV2(rl_packetV2_t packet); // For legacy, there is only send packet
-    void publishPaquetV3(rl_packetV3_t packet); // For legacy, there is only send packet
-    void publishPaquet(rl_packets packet, byte version = 0);
-    void publishNum(byte destinationid, byte senderid, byte childid, rl_device_t sensortype, const long value, byte version = 0);
-    void publishFloat(byte destinationid, byte senderid, byte childid, rl_device_t sensortype, const long value, const int divider, const byte precision, byte version = 0);
+    void publishPaquet(rl_packets* packet, byte version = 0);
+    void publishBool(byte destinationid, byte senderid, byte childid, const uint8_t value, byte version = 0);
+    void publishNum(byte destinationid, byte senderid, byte childid, const long value, byte version = 0);
+    void publishFloat(byte destinationid, byte senderid, byte childid, const long value, const int divider, const byte precision, byte version = 0);
+    void publishSwitch(byte destinationid, byte senderid, byte childid, const uint8_t value, byte version = 0);
     void publishText(byte destinationid, byte senderid, byte childid, const char* text, byte version = 0);
     void publishTag(byte destinationid, byte senderid, byte childid, const uint32_t tagH, const uint32_t tagL, const byte readerID, const byte readerType, byte version = 0);
     void publishRaw(byte destinationid, byte senderid, byte childid, const uint8_t* data, const byte len, byte version = 0);
     void publishLight(byte destinationid, byte senderid, byte childid, uint8_t state, uint8_t brightness, uint16_t temperature, uint8_t red, uint8_t green, uint8_t blue, byte version = 0);
     void publishCover(byte destinationid, byte senderid, byte childid, uint8_t command, uint8_t position, byte version = 0);
-    void publishConfig(byte destinationid, byte senderid, byte childid, const uint8_t* data, const byte len, byte version = 0);
+    void publishConfig(byte destinationid, byte senderid, byte childid, rl_config_t cnf, byte version = 0);
   private:
     uint8_t _waitOnTx;
 };
