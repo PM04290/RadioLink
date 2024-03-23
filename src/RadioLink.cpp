@@ -86,6 +86,16 @@
 	const uint8_t RL_DEFAULT_SS_PIN     = 12;
 	const uint8_t RL_DEFAULT_RESET_PIN  =  4;
 	const uint8_t RL_DEFAULT_DINT_PIN   = 35;
+#elif defined(__AVR_ATmega32U4__)
+	const uint8_t RL_NEW_MISO           = 0;
+	const uint8_t RL_NEW_MOSI           = 0;
+	const uint8_t RL_NEW_SCLK           = 0;
+	const uint8_t RL_NEW_SS             = 0;
+	SPIClass* RL_DEFAULT_SPI            = &SPI;
+	const long RL_DEFAULT_SPI_FREQUENCY = 8E6;
+	const uint8_t RL_DEFAULT_SS_PIN     = 10;
+	const uint8_t RL_DEFAULT_RESET_PIN  = 9;
+	const uint8_t RL_DEFAULT_DINT_PIN   = 7;
 #else
 	const uint8_t RL_NEW_MISO           = 0;
 	const uint8_t RL_NEW_MOSI           = 0;
