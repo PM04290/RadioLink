@@ -252,7 +252,7 @@ int RLhelper_SX1278::lqi()
   if(rawSNR < 0.0) {
 	rssi += rawSNR;
   }
-  return map(rssi, -120, -20, 0, 100);
+  return map(rssi, -128, -10, 0, 100);
 }
 
 void RLhelper_SX1278::handleDintRise()

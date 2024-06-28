@@ -2,8 +2,8 @@
 	By Matiere&lumiere
 	https://github.com/PM04290/
 
-	Version 0.1 : initial
-	Version 0.2 : add NRF24l01
+	Version 1.1 : initial
+	Version 2.0 : packet release (config)
 	
 	Supported hardware radio:
 	- SX1278 (eg. Ra-01)
@@ -28,6 +28,16 @@
 	const uint8_t RL_DEFAULT_SS_PIN     = 3;
 	const uint8_t RL_DEFAULT_RESET_PIN  = 2;
 	const uint8_t RL_DEFAULT_DINT_PIN   = 8;
+#elif defined(__AVR_ATtiny1616__) || defined(__AVR_ATtiny3216__)
+	const uint8_t RL_NEW_MISO           = 0;
+	const uint8_t RL_NEW_MOSI           = 0;
+	const uint8_t RL_NEW_SCLK           = 0;
+	const uint8_t RL_NEW_SS             = 0;
+	SPIClass* RL_DEFAULT_SPI            = &SPI;
+	const long RL_DEFAULT_SPI_FREQUENCY = 8E6; // not used
+	const uint8_t RL_DEFAULT_SS_PIN     = 0;
+	const uint8_t RL_DEFAULT_RESET_PIN  = 1;
+	const uint8_t RL_DEFAULT_DINT_PIN   = 13;
 #elif defined(ESP32)
 	#if defined(ARDUINO_LOLIN_S2_MINI)
 		// defining NEW spi pin
@@ -41,7 +51,7 @@
 		const uint8_t RL_DEFAULT_SS_PIN     =  5;
 		const uint8_t RL_DEFAULT_RESET_PIN  = 12;
 		const uint8_t RL_DEFAULT_DINT_PIN   =  3;
-	#elif defined(ARDUINO_ESP32_POE_ISO)
+	#elif defined(ARDUINO_ESP32_POE_ISO) || defined(ARDUINO_ESP32_POE)
 		// defining NEW spi pin
 		//#define RL_DEFAULT_SPI         not defined for specific SPI
 		const uint8_t RL_NEW_MISO           = 15;
@@ -134,7 +144,7 @@ ISR_PREFIX void RLhelper_base::onDintRise()
   RLhelper.handleDintRise();
 }
 
-bool RadioLinkClass::begin(long frequency, void(*callbackR)(uint8_t,rl_packet_t*), void(*callbackT)(), int TxLevel)
+bool RadioLinkClass::begin(long frequency, void(*callbackR)(uint8_t,rl_packet_t*), void(*callbackT)(), int TxLevel, uint8_t radioDistance)
 {
   _onRxDone = callbackR;
   _onTxDone = callbackT;
@@ -143,9 +153,8 @@ bool RadioLinkClass::begin(long frequency, void(*callbackR)(uint8_t,rl_packet_t*
 	RLhelper.onInternalRxDone(onRxDone);
 	RLhelper.onInternalTxDone(onTxDone);
 	RLhelper.setTxPower(TxLevel);
-	//RLhelper.setSpreadingFactor(9);
-	//RLhelper.setSignalBandwidth(6);
-	//RLhelper.setCodingRate4(7);
+	setRadioDistance(radioDistance);
+	
 	RLhelper.receiveMode();
 	return true;
   }
@@ -160,7 +169,7 @@ void RadioLinkClass::end()
 void RadioLinkClass::onRxDone(int packetSize)
 {
   if (packetSize == 0) return;
-  if (packetSize > sizeof(currentPacket)) packetSize = sizeof(currentPacket);
+  if ((size_t)packetSize > sizeof(currentPacket)) packetSize = sizeof(currentPacket);
   byte* raw = (byte*)&currentPacket;
   RLhelper.read(raw, packetSize);
   uint8_t crc = CRC_PRELOAD;
@@ -205,6 +214,32 @@ void RadioLinkClass::setWaitOnTx(bool state)
 	_waitOnTx = state;
 }
 
+void RadioLinkClass::setRadioDistance(uint8_t n) // 0 .. 3
+{
+	if (n == 3) {
+		RLhelper.setSpreadingFactor(11);   // 7 .. 12
+		RLhelper.setSignalBandwidth(6);    // 0 .. 9
+		RLhelper.setCodingRate4(4);        // 1 .. 4
+		return;
+	}
+	if (n == 2) {
+		RLhelper.setSpreadingFactor(10);   // 7 .. 12
+		RLhelper.setSignalBandwidth(6);    // 0 .. 9
+		RLhelper.setCodingRate4(3);        // 1 .. 4
+		return;
+	}
+	if (n == 1) {
+		RLhelper.setSpreadingFactor(9);   // 7 .. 12
+		RLhelper.setSignalBandwidth(7);   // 0 .. 9
+		RLhelper.setCodingRate4(2);       // 1 .. 4
+		return;
+	}
+	// Default : SF=7, BW = 7, CR=1
+	RLhelper.setSpreadingFactor(7);   // 7 .. 12
+	RLhelper.setSignalBandwidth(8);   // 0 .. 9
+	RLhelper.setCodingRate4(1);       // 1 .. 4
+}
+
 void RadioLinkClass::publishPaquet(rl_packets* packet, byte version)
 {
   if (version == 0 || version == RL_CURRENT_VERSION)
@@ -230,7 +265,7 @@ void RadioLinkClass::publishBool(byte destinationid, byte senderid, byte childid
 		  packet.current.destinationID = destinationid;
 		  packet.current.senderID = senderid;
 		  packet.current.childID = childid;
-		  packet.current.sensordataType = (S_BINARYSENSOR << 3) + V_BOOL;
+		  packet.current.sensordataType = (E_BINARYSENSOR << 3) + D_BOOL;
 		  packet.current.data.num.value = value;
 	  break;
   }
@@ -246,16 +281,15 @@ void RadioLinkClass::publishNum(byte destinationid, byte senderid, byte childid,
 		  packet.current.destinationID = destinationid;
 		  packet.current.senderID = senderid;
 		  packet.current.childID = childid;
-		  packet.current.sensordataType = (S_NUMERICSENSOR << 3) + V_NUM;
+		  packet.current.sensordataType = (E_NUMERICSENSOR << 3) + D_NUM;
 		  packet.current.data.num.value = value;
-		  packet.current.data.num.divider = 0;
-		  packet.current.data.num.precision = 0;
+		  packet.current.data.num.divider = 1;
 	  break;
   }
   publishPaquet(&packet, version);
 }
 
-void RadioLinkClass::publishFloat(byte destinationid, byte senderid, byte childid, const long value, const int divider, const byte precision, byte version)
+void RadioLinkClass::publishFloat(byte destinationid, byte senderid, byte childid, const long value, const int divider, byte version)
 {
   rl_packets packet;
   switch (version) {
@@ -264,10 +298,9 @@ void RadioLinkClass::publishFloat(byte destinationid, byte senderid, byte childi
 		  packet.current.destinationID = destinationid;
 		  packet.current.senderID = senderid;
 		  packet.current.childID = childid;
-		  packet.current.sensordataType =  (S_NUMERICSENSOR << 3) + V_FLOAT;
+		  packet.current.sensordataType =  (E_NUMERICSENSOR << 3) + D_FLOAT;
 		  packet.current.data.num.value = value;
 		  packet.current.data.num.divider = divider;
-		  packet.current.data.num.precision = precision;
 	  break;
   }
   publishPaquet(&packet, version);
@@ -282,10 +315,9 @@ void RadioLinkClass::publishSwitch(byte destinationid, byte senderid, byte child
 		  packet.current.destinationID = destinationid;
 		  packet.current.senderID = senderid;
 		  packet.current.childID = childid;
-		  packet.current.sensordataType = (S_SWITCH << 3) + V_NUM;
+		  packet.current.sensordataType = (E_SWITCH << 3) + D_NUM;
 		  packet.current.data.num.value = value;
-		  packet.current.data.num.divider = 0;
-		  packet.current.data.num.precision = 0;
+		  packet.current.data.num.divider = 1;
 	  break;
   }
   publishPaquet(&packet, version);
@@ -304,7 +336,7 @@ void RadioLinkClass::publishText(byte destinationid, byte senderid, byte childid
 		  packet.current.destinationID = destinationid;
 		  packet.current.senderID = senderid;
 		  packet.current.childID = childid;
-		  packet.current.sensordataType =  (S_TEXTSENSOR << 3) + V_TEXT;
+		  packet.current.sensordataType =  (E_TEXTSENSOR << 3) + D_TEXT;
 		  strncpy(packet.current.data.text, text, l);
 		  if (l < MAX_PACKET_DATA_LEN) {
 			packet.current.data.text[l] = 0;
@@ -323,7 +355,7 @@ void RadioLinkClass::publishTag(byte destinationid, byte senderid, byte childid,
 		  packet.current.destinationID = destinationid;
 		  packet.current.senderID = senderid;
 		  packet.current.childID = childid;
-		  packet.current.sensordataType =  (S_TAG << 3) + V_TAG;
+		  packet.current.sensordataType =  (E_TAG << 3) + D_TAG;
 		  packet.current.data.tag.tagH = tagH;
 		  packet.current.data.tag.tagL = tagL;
 		  packet.current.data.tag.readerID = readerID;
@@ -342,7 +374,7 @@ void RadioLinkClass::publishRaw(byte destinationid, byte senderid, byte childid,
 		  packet.current.destinationID = destinationid;
 		  packet.current.senderID = senderid;
 		  packet.current.childID = childid;
-		  packet.current.sensordataType =  (S_CUSTOM << 3) + V_RAW;
+		  packet.current.sensordataType =  (E_CUSTOM << 3) + D_RAW;
 		  for (byte b = 0; b < len && b < MAX_PACKET_DATA_LEN; b++) {
 			packet.current.data.rawByte[b] = data[b];
 		  }
@@ -360,7 +392,7 @@ void RadioLinkClass::publishLight(byte destinationid, byte senderid, byte childi
 		  packet.current.destinationID = destinationid;
 		  packet.current.senderID = senderid;
 		  packet.current.childID = childid;
-		  packet.current.sensordataType =  (S_LIGHT << 3) + V_RAW;
+		  packet.current.sensordataType =  (E_LIGHT << 3) + D_RAW;
 		  packet.current.data.light.state = state;
 		  packet.current.data.light.brightness = brightness;
 		  packet.current.data.light.temperature = temperature;
@@ -381,7 +413,7 @@ void RadioLinkClass::publishCover(byte destinationid, byte senderid, byte childi
 		  packet.current.destinationID = destinationid;
 		  packet.current.senderID = senderid;
 		  packet.current.childID = childid;
-		  packet.current.sensordataType =  (S_COVER << 3) + V_RAW;
+		  packet.current.sensordataType =  (E_COVER << 3) + D_RAW;
 		  packet.current.data.cover.state = 0;
 		  packet.current.data.cover.command = command;
 		  packet.current.data.cover.position = position;
@@ -390,7 +422,7 @@ void RadioLinkClass::publishCover(byte destinationid, byte senderid, byte childi
   publishPaquet(&packet, version);
 }
 
-void RadioLinkClass::publishConfig(byte destinationid, byte senderid, byte childid, rl_config_t cnf, byte version)
+void RadioLinkClass::publishConfig(byte destinationid, byte senderid, rl_configs_t* cnf, rl_conf_t cnfIdx, byte version)
 {
   rl_packets packet;
   switch (version) {
@@ -398,9 +430,9 @@ void RadioLinkClass::publishConfig(byte destinationid, byte senderid, byte child
 	  default:
 		  packet.current.destinationID = destinationid;
 		  packet.current.senderID = senderid;
-		  packet.current.childID = childid;
-		  packet.current.sensordataType =  (S_CONFIG << 3) + V_RAW;
-		  packet.current.data.config = cnf;
+		  packet.current.childID = RL_ID_CONFIG;
+		  packet.current.sensordataType =  (E_CONFIG << 3) + (cnfIdx&0x7);
+		  memcpy(&packet.current.data.configs, cnf, sizeof(rl_configs_t));
 	  break;
   }
   publishPaquet(&packet, version);

@@ -1,48 +1,84 @@
 #ifndef RLPACKET_H_
 #define RLPACKET_H_
-
+/* Revision 2.0
+ *
+ */
 #include <Arduino.h>
 
 #define RL_CURRENT_VERSION 1
 
+
 typedef enum {
-  S_BINARYSENSOR    = 0,
-  S_NUMERICSENSOR   = 1,
-  S_SWITCH          = 2,
-  S_LIGHT           = 3,
-  S_COVER           = 4,
-  S_FAN             = 5,
-  S_HVAC            = 6,
-  S_SELECT          = 7,
-  S_TRIGGER         = 8,
-  S_CUSTOM          = 9,
-  S_TAG             = 10,
-  S_TEXTSENSOR      = 11,
-  S_INPUTNUMBER     = 12,
+  E_BINARYSENSOR    = 0,
+  E_NUMERICSENSOR   = 1,
+  E_SWITCH          = 2,
+  E_LIGHT           = 3,
+  E_COVER           = 4,
+  E_FAN             = 5,
+  E_HVAC            = 6,
+  E_SELECT          = 7,
+  E_TRIGGER         = 8,
+  E_EVENT           = 9,
+  E_TAG             = 10,
+  E_TEXTSENSOR      = 11,
+  E_INPUTNUMBER     = 12,
+  E_CUSTOM          = 13,
+  E_DATE            = 14,
+  E_TIME            = 15,
+  E_DATETIME        = 16,
   //\ add new before this line
-  S_CONFIG          = 31, // for internal use only
-} rl_device_t; // limited to 31
+  E_CONFIG          = 31, // for internal use only
+} rl_element_t; // limited to 31
 
 //
 typedef enum {
-  V_BOOL    = 0,
-  V_NUM     = 1,
-  V_FLOAT   = 2,
-  V_TEXT    = 3,
-  V_TAG     = 4,
-  V_RAW     = 5
+  D_BOOL    = 0,
+  D_NUM     = 1,
+  D_FLOAT   = 2,
+  D_TEXT    = 3,
+  D_TAG     = 4,
+  D_RAW     = 5
 } rl_data_t; // limited to 7
+
+
+typedef enum {
+  C_BASE    = 0,
+  C_UNIT    = 1,
+  C_OPTS    = 2,
+  C_NUMS    = 3,
+  //\ add new before this line
+  C_END     = 7
+} rl_conf_t; // limited to 7
 
 
 // V1 (current version)
 #define MAX_PACKET_DATA_LEN_V1 16
-typedef struct {
+typedef struct __attribute__((packed)) {
   uint8_t childID;
   uint8_t deviceType;
   uint8_t dataType;
-  uint8_t reserved[MAX_PACKET_DATA_LEN_V1-3-6];
-  char unit[6];
-} rl_config_t;
+  char name[MAX_PACKET_DATA_LEN_V1-3];
+} rl_configBase_t;
+
+typedef struct __attribute__((packed)) {
+  uint8_t childID;
+  char text[MAX_PACKET_DATA_LEN_V1-1];
+} rl_configText_t;
+
+typedef struct __attribute__((packed)) {
+  uint8_t childID;
+  int32_t mini;
+  int32_t maxi;
+  uint16_t divider;
+  uint16_t step;
+  char text[MAX_PACKET_DATA_LEN_V1-13];
+} rl_configNums_t;
+
+typedef union  __attribute__((packed)) {
+	rl_configBase_t base;
+	rl_configText_t text;
+	rl_configNums_t nums;
+} rl_configs_t;
 
 typedef struct __attribute__((packed)) {
   uint8_t destinationID;
@@ -53,8 +89,6 @@ typedef struct __attribute__((packed)) {
     struct {
       int32_t value;
       uint16_t divider;
-      uint8_t precision;
-      char unit[5];
     } num;
     char text[MAX_PACKET_DATA_LEN_V1];
     uint8_t rawByte[MAX_PACKET_DATA_LEN_V1];
@@ -78,7 +112,7 @@ typedef struct __attribute__((packed)) {
 	  uint8_t command;
 	  uint8_t position;
 	} cover;
-    rl_config_t config;
+	rl_configs_t configs;
   } data;
   uint8_t crc; // must be the last : for calculation with sizeof()-1
 } rl_packetV1_t;
@@ -93,5 +127,10 @@ typedef union {
   rl_packet_t current;
   rl_packetV1_t v1;
 } rl_packets;
+
+#define RL_ID_BROADCAST 0xFF
+#define RL_ID_CONFIG    0xFE
+#define RL_ID_PING      0xFD
+#define RL_ID_DATETIME  0xFC
 
 #endif
