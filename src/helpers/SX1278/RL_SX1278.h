@@ -24,6 +24,8 @@ class RLhelper_SX1278 : public RLhelper_base {
 	void onInternalRxDone(void(*callback)(int)) override;
 	void onInternalTxDone(void(*callback)()) override;
 	bool isTransmitting() override;
+	void setOCP(uint8_t mA);
+	void setDint(uint8_t pin) override;
   private:
 	//static void onDintRise();
 #if !defined(__AVR_ATtiny84__)
@@ -32,12 +34,11 @@ class RLhelper_SX1278 : public RLhelper_base {
     int _ss;
     SPIClass* _spi;
   protected:
-    int _reset;
+    uint8_t _reset;
     long _frequency;
     uint8_t readRegister(uint8_t address);
 	void writeRegister(uint8_t address, uint8_t value);
     uint8_t singleTransfer(uint8_t address, uint8_t value);
-	void setOCP(uint8_t mA);
 	void setLdoFlag();
 	int getSpreadingFactor();
 	long getSignalBandwidth();

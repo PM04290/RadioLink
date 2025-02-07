@@ -4,12 +4,11 @@
 
 	Version 1.1 : initial
 	Version 2.0 : packet release (config)
+	Version 2.1 : DEFAULT pin user configurable
 	
 	Supported hardware radio:
-	- SX1278 (eg. Ra-01)
+	- SX1278 (eg. Ra-02)
 	
-	pour détection des différents hardware
-	https://github.com/houtbrion/detectArduinoHardware/blob/1bed091c85e1a4398ab476a34d14334f22452c06/src/detectArduinoHardware.h
 */
 #include <RadioLink.h>
 
@@ -28,16 +27,26 @@
 	const uint8_t RL_DEFAULT_SS_PIN     = 3;
 	const uint8_t RL_DEFAULT_RESET_PIN  = 2;
 	const uint8_t RL_DEFAULT_DINT_PIN   = 8;
-#elif defined(__AVR_ATtiny1616__) || defined(__AVR_ATtiny3216__)
+#elif defined(__AVR_ATtiny814__) || defined(__AVR_ATtiny1614__)
 	const uint8_t RL_NEW_MISO           = 0;
 	const uint8_t RL_NEW_MOSI           = 0;
 	const uint8_t RL_NEW_SCLK           = 0;
 	const uint8_t RL_NEW_SS             = 0;
 	SPIClass* RL_DEFAULT_SPI            = &SPI;
 	const long RL_DEFAULT_SPI_FREQUENCY = 8E6; // not used
-	const uint8_t RL_DEFAULT_SS_PIN     = 0;
-	const uint8_t RL_DEFAULT_RESET_PIN  = 1;
-	const uint8_t RL_DEFAULT_DINT_PIN   = 13;
+	const uint8_t RL_DEFAULT_SS_PIN     = PIN_PA4;
+	const uint8_t RL_DEFAULT_RESET_PIN  = PIN_PA7;
+	const uint8_t RL_DEFAULT_DINT_PIN   = PIN_PA6;
+#elif defined(__AVR_ATtiny1616__) || defined(__AVR_ATtiny3216__) || defined(__AVR_ATtiny1617__) || defined(__AVR_ATtiny3217__)
+	const uint8_t RL_NEW_MISO           = 0;
+	const uint8_t RL_NEW_MOSI           = 0;
+	const uint8_t RL_NEW_SCLK           = 0;
+	const uint8_t RL_NEW_SS             = 0;
+	SPIClass* RL_DEFAULT_SPI            = &SPI;
+	const long RL_DEFAULT_SPI_FREQUENCY = 8E6; // not used
+	const uint8_t RL_DEFAULT_SS_PIN     = PIN_PA4;
+	const uint8_t RL_DEFAULT_RESET_PIN  = PIN_PA7;
+	const uint8_t RL_DEFAULT_DINT_PIN   = PIN_PA6;
 #elif defined(ESP32)
 	#if defined(ARDUINO_LOLIN_S2_MINI)
 		// defining NEW spi pin
@@ -75,6 +84,16 @@
 		const uint8_t RL_DEFAULT_SS_PIN     =  12;
 		const uint8_t RL_DEFAULT_RESET_PIN  =  4;
 		const uint8_t RL_DEFAULT_DINT_PIN   =  35;
+	#elif defined(ARDUINO_TTGO_LoRa32_v21new)
+		const uint8_t RL_NEW_MISO           = 0;
+		const uint8_t RL_NEW_MOSI           = 0;
+		const uint8_t RL_NEW_SCLK           = 0;
+		const uint8_t RL_NEW_SS             = 0;
+		SPIClass* RL_DEFAULT_SPI            = &SPI;
+		const long RL_DEFAULT_SPI_FREQUENCY = 8E6;
+		const uint8_t RL_DEFAULT_SS_PIN     = 18;
+		const uint8_t RL_DEFAULT_RESET_PIN  = 23;
+		const uint8_t RL_DEFAULT_DINT_PIN   = 26;
 	#else
 		const uint8_t RL_NEW_MISO           = 0;
 		const uint8_t RL_NEW_MOSI           = 0;
@@ -209,6 +228,10 @@ void RadioLinkClass::idle() {
   return RLhelper.idle();
 }
 
+void RadioLinkClass::setDint(uint8_t pin) {
+	RLhelper.setDint(pin);
+}
+
 void RadioLinkClass::setWaitOnTx(bool state)
 {
 	_waitOnTx = state;
@@ -238,6 +261,11 @@ void RadioLinkClass::setRadioDistance(uint8_t n) // 0 .. 3
 	RLhelper.setSpreadingFactor(7);   // 7 .. 12
 	RLhelper.setSignalBandwidth(8);   // 0 .. 9
 	RLhelper.setCodingRate4(1);       // 1 .. 4
+}
+
+void RadioLinkClass::setOCP(uint8_t mA)
+{
+	RLhelper.setOCP(mA);
 }
 
 void RadioLinkClass::publishPaquet(rl_packets* packet, byte version)

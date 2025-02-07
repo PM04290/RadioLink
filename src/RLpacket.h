@@ -1,6 +1,6 @@
 #ifndef RLPACKET_H_
 #define RLPACKET_H_
-/* Revision 2.0
+/* Revision 2.2
  *
  */
 #include <Arduino.h>
@@ -26,6 +26,7 @@ typedef enum {
   E_DATE            = 14,
   E_TIME            = 15,
   E_DATETIME        = 16,
+  E_BUTTON          = 17,
   //\ add new before this line
   E_CONFIG          = 31, // for internal use only
 } rl_element_t; // limited to 31
@@ -47,6 +48,7 @@ typedef enum {
   C_OPTS    = 2,
   C_NUMS    = 3,
   //\ add new before this line
+  C_PARAM   = 6,
   C_END     = 7
 } rl_conf_t; // limited to 7
 
@@ -62,7 +64,8 @@ typedef struct __attribute__((packed)) {
 
 typedef struct __attribute__((packed)) {
   uint8_t childID;
-  char text[MAX_PACKET_DATA_LEN_V1-1];
+  uint8_t index;
+  char text[MAX_PACKET_DATA_LEN_V1-2];
 } rl_configText_t;
 
 typedef struct __attribute__((packed)) {
@@ -74,10 +77,19 @@ typedef struct __attribute__((packed)) {
   char text[MAX_PACKET_DATA_LEN_V1-13];
 } rl_configNums_t;
 
+typedef struct __attribute__((packed)) {
+  uint8_t childID;
+  int32_t pInt;
+  int32_t pFloatWholepart;
+  uint16_t pFloatDivider;
+  char text[MAX_PACKET_DATA_LEN_V1-11];
+} rl_configParam_t;
+
 typedef union  __attribute__((packed)) {
 	rl_configBase_t base;
 	rl_configText_t text;
 	rl_configNums_t nums;
+	rl_configParam_t param;
 } rl_configs_t;
 
 typedef struct __attribute__((packed)) {
@@ -109,8 +121,8 @@ typedef struct __attribute__((packed)) {
 	} light;
 	struct {
 	  uint8_t state;
-	  uint8_t command;
-	  uint8_t position;
+	  uint8_t command; // 0: stop, 1:open, 2:close
+	  uint8_t position; // 0 to 100 %
 	} cover;
 	rl_configs_t configs;
   } data;

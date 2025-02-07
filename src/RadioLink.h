@@ -36,8 +36,10 @@ class RadioLinkClass
 	int  lqi();
 	void sleep();
 	void idle();
+	void setDint(uint8_t pin);
 	void setWaitOnTx(bool state);
 	void setRadioDistance(uint8_t n); // 0 .. 3
+	void setOCP(uint8_t mA);
     void publishPaquet(rl_packets* packet, byte version = 0);
     void publishBool(byte destinationid, byte senderid, byte childid, const uint8_t value, byte version = 0);
     void publishNum(byte destinationid, byte senderid, byte childid, const long value, byte version = 0);

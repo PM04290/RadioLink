@@ -26,6 +26,7 @@ class RLhelper_base {
 	virtual void onInternalRxDone(void(*callback)(int)) {};
 	virtual void onInternalTxDone(void(*callback)()) {};
 	virtual bool isTransmitting() { return false; } ;
+	virtual void setDint(uint8_t pin);
 
   protected:
   	static void onDintRise();
